@@ -52,15 +52,12 @@ for log_file in lib_directory.glob('*.log'):
     with open(log_file, 'r', encoding='utf-8') as file:
         log_content = file.read()
         times = extract_task_times(log_content)
-        # Create identifiers based on the directory and file names
-        batch_name = lib_directory.name
-        dir_name = log_file.parent.name
-        run_and_batch = f"{batch_name}/{dir_name}"
+        library_name = lib_directory.name  # Use library name for identification
         # Append data to the list
-        time_data.append([run_and_batch, dir_name, batch_name] + [times[task] for task in task_patterns])
+        time_data.append([library_name] + [times[task] for task in task_patterns])
 
 # Adjust the headers to include the new columns
-headers = ["Run_and_Batch", "Directory Name", "Batch Name"] + list(task_patterns.keys())
+headers = ["Library"] + list(task_patterns.keys())
 
 # Write the extracted data to a tab-separated file
 with open(output_file, 'w', newline='', encoding='utf-8') as tabfile:

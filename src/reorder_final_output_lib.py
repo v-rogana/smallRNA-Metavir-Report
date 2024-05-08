@@ -3,10 +3,8 @@ import csv
 import argparse
 
 def process_file(input_file, output_file):
-    # Column name mappings
+    # Column name mappings to clean up or normalize names
     column_map = {
-        "Directory Name": "Directory_Name",
-        "Batch Name": "Batch_Name",
         "Preprocessed_reads": "Reads_unmapped_bacter",
         "Total_Size(MB)": "du_Total_Size",
         "DIAMOND (Blastx)": "DIAMOND",
@@ -34,9 +32,9 @@ def process_file(input_file, output_file):
         "reads_mapped_no_hit": "reads_mapped_no_hit"
     }
 
-    # New column order
+    # Defined new column order
     new_order = [
-        "Directory_Name", "Batch_Name", "Total_reads", "Reads_mapped_host", "Reads_unmapped_host",
+        "Library", "Total_reads", "Reads_mapped_host", "Reads_unmapped_host",
         "Reads_mapped_bacter", "Reads_unmapped_bacter", "Contigs_gt200", "Number_viral_contigs",
         "Number_nonviral_contigs", "Number_no_hit_contigs", "Contigs_blastN_viral",
         "Contigs_blastN_non_viral", "Contigs_blastN_no_hits", "Contigs_diamond_viral",
@@ -90,5 +88,3 @@ if __name__ == "__main__":
     parser.add_argument("output_file", type=str, help="Path for the processed output tab-separated file.")
     args = parser.parse_args()
     process_file(args.input_file, args.output_file)
-
-

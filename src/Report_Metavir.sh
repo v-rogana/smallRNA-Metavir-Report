@@ -1,68 +1,55 @@
 #!/bin/bash
 
-# Check if the required number of arguments is passed
-if [ "$#" -ne 3 ]; then
-    echo "Usage: $0 <batch_base_dir> <script_dir> <final_output_name>"
+# This script coordinates the execution of various data processing tasks for a given library directory and outputs a unified report directly to a specified file.
+
+# Check if the correct number of arguments is provided
+if [ "$#" -ne 2 ]; then
+    echo "Usage: $0 <lib_directory> <final_report.tab>"
     exit 1
 fi
 
-# Assign arguments to variables
-batch_base_dir="$1"
-script_dir="$2"
-final_output_name="$3"
+# Assign command line arguments to variables
+lib_directory=$1
+final_output=$2
 
-# Define the output file for the concatenated tabs
-concatenated_output="${script_dir}/metavir_data_batch_r2d2.tab"
+# Temporary file to hold unified output before final processing
+tmp_unified_output="tmp_unified_output.tab"
 
-# Initialize an empty temporary file to store list of all tab files
-tab_list="${script_dir}/all_tabs_list.txt"
-: > "$tab_list"  # Clear or create empty file
+# Process classifier metadata
+echo "Processing classifier metadata..."
+classifier_output=$(mktemp)
+python3 Classifier_metadata_lib.py "$lib_directory" "$classifier_output"
 
-# Loop through each batch directory in the batch base directory
-for batch_dir in ${batch_base_dir}batch_*; do
-    if [ -d "$batch_dir" ]; then
-        batch_name=$(basename "$batch_dir")
-        echo "Processing $batch_name..."
+# Counting mapped reads using samtools
+echo "Counting mapped reads using samtools..."
+mapped_output=$(mktemp)
+bash Mapped_samtools_count_lib.sh "$lib_directory" "$mapped_output"
 
-        # Process mapped samtools count
-        mapped_output="${script_dir}/mapped_samtools_${batch_name}.tab"
-        "${script_dir}/Mapped_samtools_count_v2.sh" "$batch_dir" "$mapped_output"
-        echo "$mapped_output" >> "$tab_list"
+# Extracting additional metadata from log files
+echo "Extracting additional metadata from log files..."
+metadata_output=$(mktemp)
+python3 Metadata_extraction_from_log_lib.py "$lib_directory" "$metadata_output"
 
-        # Task times
-        task_output="${script_dir}/task_times_${batch_name}.tab"
-        python3 "${script_dir}/Task_times_v5.py" "$batch_dir" "$task_output"
-        echo "$task_output" >> "$tab_list"
+# Calculating subdirectory sizes
+echo "Calculating subdirectory sizes..."
+size_output=$(mktemp)
+python3 Subdirectory_sizes_lib.py "$lib_directory" "$size_output"
 
-        # Subdirectory sizes
-        size_output="${script_dir}/size_subdir_${batch_name}.tab"
-        python3 "${script_dir}/Subdirectory_sizes_v5.py" "$batch_dir" "$size_output"
-        echo "$size_output" >> "$tab_list"
+# Collecting task times
+echo "Collecting task times..."
+task_times_output=$(mktemp)
+python3 Task_times_lib.py "$lib_directory" "$task_times_output"
 
-        # Metadata extraction from log
-        log_output="${script_dir}/log_${batch_name}.tab"
-        python3 "${script_dir}/Metadata_extraction_from_log_v3.py" "$batch_dir" "$log_output"
-        echo "$log_output" >> "$tab_list"
+# Unifying all outputs into a single temporary file
+echo "Unifying all outputs..."
+python3 unificando_outputs_lib.py "$tmp_unified_output" "$classifier_output" "$mapped_output" "$metadata_output" "$size_output" "$task_times_output"
 
-        # Classifier metadata
-        classifier_output="${script_dir}/classifier_${batch_name}.tab"
-        python3 "${script_dir}/Classifier_metadata_v3.py" "$batch_dir" "$classifier_output"
-        echo "$classifier_output" >> "$tab_list"
-    fi
-done
+# Remove all temporary output files
+rm "$classifier_output" "$mapped_output" "$metadata_output" "$size_output" "$task_times_output"
 
-# Concatenate all generated tab files
-tab_files=$(cat "$tab_list")
-python3 "${script_dir}/unificando_outputs_v3.py" "$concatenated_output" $tab_files
+# Reordering and finalizing the report
+echo "Reordering and finalizing the report..."
+python3 reorder_final_output_lib.py "$tmp_unified_output" "$final_output"
+rm "$tmp_unified_output"
 
-# Reorder final output
-final_reorder_output="${script_dir}/${final_output_name}"
-python3 "${script_dir}/reorder_final_output_v2.py" "$concatenated_output" "$final_reorder_output"
-
-# Cleanup temporary and intermediate files
-rm "$tab_list"
-rm $tab_files
-rm "$concatenated_output"
-
-echo "All processing completed. Final reordered output is stored in $final_reorder_output"
-
+echo "Report generation complete. Results stored in $final_output"
