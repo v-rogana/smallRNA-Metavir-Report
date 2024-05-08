@@ -6,14 +6,14 @@ from pathlib import Path
 
 # Set up argument parser
 parser = argparse.ArgumentParser(description="Count combination of the neural network classification")
-parser.add_argument("base_directory", type=str, help="Base directory containing the target directories")
+parser.add_argument("lib_directory", type=str, help="Library directory containing the target files for classification")
 parser.add_argument("output_file_name", type=str, help="Name of the output file")
 
 # Parse arguments
 args = parser.parse_args()
 
 # Use the provided arguments
-base_directory = Path(args.base_directory)
+lib_directory = Path(args.lib_directory)
 output_file = Path.cwd() / args.output_file_name
 
 # Define the combinations to track in the desired order
@@ -26,7 +26,7 @@ combinations = [
 output_rows = []
 
 # Loop through each CSV file in the specified path
-for csv_file in base_directory.rglob('*_virome*/13_virus_eve_classif/*.csv'):
+for csv_file in lib_directory.glob('13_virus_eve_classif/*.csv'):
     print(f"Processing {csv_file}")
     # Initialize counts for this file
     counts = defaultdict(int)  # Use defaultdict to initialize counts to 0
@@ -39,11 +39,9 @@ for csv_file in base_directory.rglob('*_virome*/13_virus_eve_classif/*.csv'):
                 # Adjust combination keys to match the new format (replace commas with underscores)
                 key = f"{row[2]}_{row[51]}".replace(",", "_")
                 counts[key] += 1
-    # Get the last two parts of the path
-    run_and_batch = '/'.join(csv_file.parent.parent.parts[-2:])  # This moves two levels up from the CSV file
 
     # Prepare the row for this directory
-    row = [run_and_batch] + [counts[comb] for comb in combinations]
+    row = [lib_directory.name] + [counts[comb] for comb in combinations]
     output_rows.append(row)
 
 # Write the output TAB file
@@ -51,9 +49,8 @@ with open(output_file, mode='w', encoding='utf-8', newline='') as file:
     # Specify the delimiter as a tab character
     writer = csv.writer(file, delimiter='\t')
     # Write the header, converting combinations to the format with underscores
-    writer.writerow(["Run_and_Batch"] + combinations)
+    writer.writerow(["Library"] + combinations)
     # Write the rows
     writer.writerows(output_rows)
 
 print(f"Classifier info written to {output_file}")
-

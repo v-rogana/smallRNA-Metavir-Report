@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 import csv
 import re
@@ -6,13 +5,13 @@ from pathlib import Path
 import argparse
 
 # Setup command-line argument parsing
-parser = argparse.ArgumentParser(description="Extract and report the time elapsed per task from log files.")
-parser.add_argument("base_directory", type=str, help="Directory containing the log files.")
+parser = argparse.ArgumentParser(description="Extract and report the time elapsed per task from log files in a specific library directory.")
+parser.add_argument("lib_directory", type=str, help="Library directory containing the log files.")
 parser.add_argument("output_file", type=str, help="Path for the output tab-separated file.")
 args = parser.parse_args()
 
 # Convert command-line arguments to Path objects
-base_directory = Path(args.base_directory)
+lib_directory = Path(args.lib_directory)
 output_file = Path(args.output_file)
 
 # Adjust the patterns to search for the tasks and their elapsed time more flexibly
@@ -33,10 +32,8 @@ time_elapsed_regex = r"Time elapsed: ([\d:]+)"
 def extract_task_times(log_content):
     times = {}
     for task, pattern in task_patterns.items():
-        # First, find the task pattern
         task_match = re.search(pattern, log_content, re.MULTILINE)
         if task_match:
-            # Then, search for the next occurrence of "Time elapsed" after this task
             time_match = re.search(time_elapsed_regex, log_content[task_match.end():], re.DOTALL)
             if time_match:
                 times[task] = time_match.group(1)
@@ -49,16 +46,17 @@ def extract_task_times(log_content):
 # Process log files and extract times
 time_data = []
 
-for log_file in base_directory.rglob('*_virome*/*.log'):
+# Search only within the specific library directory
+for log_file in lib_directory.glob('*.log'):
     print(f"Processing {log_file}")
     with open(log_file, 'r', encoding='utf-8') as file:
         log_content = file.read()
         times = extract_task_times(log_content)
-        # Capture the last two parts of the path as "Run_and_Batch"
-        run_and_batch = '/'.join(log_file.parts[-3:-1])  # Adjust indices based on your directory structure
-        batch_name = log_file.parts[-3]  # Adjust index based on your directory structure
+        # Create identifiers based on the directory and file names
+        batch_name = lib_directory.name
         dir_name = log_file.parent.name
-        # Include "Run_and_Batch," "Directory Name," and "Batch Name" in the row
+        run_and_batch = f"{batch_name}/{dir_name}"
+        # Append data to the list
         time_data.append([run_and_batch, dir_name, batch_name] + [times[task] for task in task_patterns])
 
 # Adjust the headers to include the new columns
@@ -71,4 +69,3 @@ with open(output_file, 'w', newline='', encoding='utf-8') as tabfile:
     writer.writerows(time_data)
 
 print(f"Time elapsed for tasks written to {output_file}")
-
