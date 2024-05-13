@@ -9,6 +9,9 @@ fi
 LIB_DIRECTORY=$1
 OUTPUT_FILE_NAME=$2
 
+# Extract just the library name from the directory path
+LIBRARY_NAME=$(basename "$LIB_DIRECTORY")
+
 # Define the combinations to track in the desired order
 declare -a combinations=("viral_viral" "viral_eve" "nohit_viral" "nohit_eve" "nonviral_viral" "nonviral_eve")
 
@@ -38,9 +41,9 @@ awk -F',' '
         }
     }
     END {
-        # Output the counts in the predefined order
+        # Output the counts in the predefined order, ensure the first count starts on a new line
         for (combo in combos) {
-            printf "%s\t", counts[combo]+0; # +0 to ensure uninitialized counts are treated as 0
+            printf "\t%s", counts[combo]+0; # +0 to ensure uninitialized counts are treated as 0
         }
         printf "\n";
     }
@@ -53,8 +56,8 @@ for comb in "${combinations[@]}"; do
 done
 echo "" >> "$OUTPUT_FILE_NAME"
 
-# Append the counts to the output file
-echo -n "$LIB_DIRECTORY" >> "$OUTPUT_FILE_NAME"
+# Append the library name and the counts to the output file
+echo -n "$LIBRARY_NAME" >> "$OUTPUT_FILE_NAME"
 cat counts.temp >> "$OUTPUT_FILE_NAME"
 rm counts.temp
 
