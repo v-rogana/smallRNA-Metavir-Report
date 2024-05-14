@@ -1,41 +1,73 @@
 #!/bin/bash
 
-# Check the number of arguments
-if [ "$#" -lt 2 ]; then
+# Check if the correct number of arguments is provided
+if [[ $# -lt 2 ]]; then
     echo "Usage: $0 <output_file> <tab_file1> <tab_file2> ..."
     exit 1
 fi
 
 output_file=$1
-shift  # Shift the first argument and use the rest as tab files
+shift # Shift the first argument and use the rest as tab files
 
-# Temporary file to store intermediate results
+# Create a temporary file for merging
 temp_file=$(mktemp)
+touch "$output_file"
 
-# Process each tab-separated file
-for tab_file in "$@"; do
-    if [ ! -f "$tab_file" ]; then
-        echo "File $tab_file does not exist."
+# Collect all headers and initialize an associative array for each library
+declare -A library_data
+headers=("Library")
+
+# Collect headers and data
+for file in "$@"; do
+    if [[ ! -f "$file" ]]; then
+        echo "Error: File '$file' not found."
         continue
     fi
-    if [ ! -s "$temp_file" ]; then
-        # If temp_file is empty, initialize it with the header and data from the first file
-        awk -F'\t' 'NR == 1 {print "Library\t" $0} NR > 1 {print $0}' "$tab_file" > "$temp_file"
-    else
-        # Merge current file with temporary file based on 'Library'
-        # Using join command to merge files by 'Library' column assumed to be the first column after the header modification
-        join -t $'\t' -a 1 -a 2 -e 'N/A' -o auto -1 1 -2 1 "$temp_file" <(awk -F'\t' 'NR == 1 {print "Library\t" $0} NR > 1 {print $0}' "$tab_file" | sort -k1,1) | sort -k1,1 > "${temp_file}.new"
-        mv "${temp_file}.new" "$temp_file"
+
+    # Read headers
+    current_headers=$(head -n 1 "$file")
+    IFS=$'\t' read -r -a current_header_array <<< "$current_headers"
+    for header in "${current_header_array[@]}"; do
+        if [[ ! " ${headers[@]} " =~ " ${header} " ]]; then
+            headers+=("$header")
+        fi
+    done
+
+    # Read data
+    while IFS=$'\t' read -r -a line_data; do
+        library=${line_data[0]}
+        library_data[$library]=$library # Initialize library key in associative array
+        for (( i=0; i<${#current_header_array[@]}; i++ )); do
+            header="${current_header_array[i]}"
+            library_data["$library;$header"]="${line_data[i]}"
+        done
+    done < <(tail -n +2 "$file") # Skip the header line
+done
+# Write to output file
+# Print the header
+{
+    printf "%s" "${headers[0]}"
+    for (( i=1; i<${#headers[@]}; i++ )); do
+        printf "\t%s" "${headers[i]}"
+    done
+    printf "\n"
+} > "$output_file"
+
+# Print the data
+for key in "${!library_data[@]}"; do
+    if [[ "$key" =~ ";" ]]; then
+        continue
     fi
+    library="$key"
+    # Start with the library value, ensuring no leading whitespace
+    {
+        printf "%s" "$library"
+        for header in "${headers[@]:1}"; do  # Skip the first header since it's already printed as the library
+            value="${library_data["$library;$header"]}"
+            printf "\t%s" "${value:-N/A}"  # Print tab first then value, no leading spaces
+        done
+        printf "\n"
+    } >> "$output_file"
 done
 
-# Add headers from all files, sort them while keeping 'Library' as the first column
-awk -F'\t' 'NR == 1 {for (i=1; i<=NF; i++) header[$i] = $i} END {printf "Library\t"; for (h in header) if (h != "Library") printf h "\t"; print ""}' "$temp_file" > "$output_file"
-
-# Add the rest of the data
-awk 'NR > 1' "$temp_file" >> "$output_file"
-
-# Clean up the temporary file
-rm "$temp_file"
-
-echo "Merged data written to $output_file"
+echo "Concatenation complete. Result stored in '$output_file'"

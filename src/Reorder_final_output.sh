@@ -45,53 +45,45 @@ declare -A column_map=(
 )
 
 # New column order
-new_order=("Library", "Total_reads", "Reads_mapped_host", "Reads_unmapped_host",
-        "Reads_mapped_bacter", "Reads_unmapped_bacter", "Contigs_gt200", "Number_viral_contigs",
-        "Number_nonviral_contigs", "Number_no_hit_contigs", "Contigs_blastN_viral",
-        "Contigs_blastN_non_viral", "Contigs_blastN_no_hits", "Contigs_diamond_viral",
-        "Contigs_diamond_non_viral", "Contigs_diamond_no_hits", "reads_mapped_viral",
-        "reads_mapped_non_viral", "reads_mapped_no_hit", "viral_viral", "viral_eve",
-        "nohit_viral", "nohit_eve", "nonviral_viral", "nonviral_eve", "du_Total_Size",
-        "du_02_filter_size_gaps_convertion", "du_03_mapping_vector", "du_04_getUnmapped",
-        "du_05_1_assembleUnmapped_opt", "du_05_2_assembleUnmapped_fix", "du_05_3_assembleUnmapped_opt_fix",
-        "du_05_4_assembleUnmapped_opt_20to23", "du_05_5_assembleUnmapped_opt_24to30", "du_05_6_cap3",
-        "du_06_blast", "du_07_reportBlast", "du_11_profiles", "du_12_z_score_small_rna_features",
-        "du_13_virus_eve_classif", "Handle_fasta_sequences", "Running_velvet",
-        "Running_velvet_optmiser", "Blastn", "DIAMOND", "Build_small_RNA_profiles", "Total_time_elapsed")
+new_order=("Library" "Total_reads" "Reads_mapped_host" "Reads_unmapped_host"
+        "Reads_mapped_bacter" "Reads_unmapped_bacter" "Contigs_gt200" "Number_viral_contigs"
+        "Number_nonviral_contigs" "Number_no_hit_contigs" "Contigs_blastN_viral"
+        "Contigs_blastN_non_viral" "Contigs_blastN_no_hits" "Contigs_diamond_viral"
+        "Contigs_diamond_non_viral" "Contigs_diamond_no_hits" "reads_mapped_viral"
+        "reads_mapped_non_viral" "reads_mapped_no_hit" "viral_viral" "viral_eve"
+        "nohit_viral" "nohit_eve" "nonviral_viral" "nonviral_eve" "du_Total_Size"
+        "du_02_filter_size_gaps_convertion" "du_03_mapping_vector" "du_04_getUnmapped"
+        "du_05_1_assembleUnmapped_opt" "du_05_2_assembleUnmapped_fix" "du_05_3_assembleUnmapped_opt_fix"
+        "du_05_4_assembleUnmapped_opt_20to23" "du_05_5_assembleUnmapped_opt_24to30" "du_05_6_cap3"
+        "du_06_blast" "du_07_reportBlast" "du_11_profiles" "du_12_z_score_small_rna_features"
+        "du_13_virus_eve_classif" "Handle_fasta_sequences" "Running_velvet"
+        "Running_velvet_optmiser" "Blastn" "DIAMOND" "Build_small_RNA_profiles" "Total_time_elapsed")
 
-# Read the header and create a new header based on mapping
-read -r header < "$input_file"
-oldIFS="$IFS"
-IFS=$'\t' read -ra headers <<< "$header"
-IFS="$oldIFS"
-
-# Create a new header line based on the new column order
-new_header=""
-for col in "${new_order[@]}"; do
-    found=0
-    for (( i=0; i<${#headers[@]}; i++ )); do
-        if [[ "${headers[i]}" == "${column_map[${headers[i]}]}" ]]; then
-            new_header+="${column_map[${headers[i]}]}\t"
-            found=1
-            break
-        elif [[ "${headers[i]}" == "${col}" ]]; then
-            new_header+="${col}\t"
-            found=1
-            break
-        fi
-    done
-    if [[ $found -eq 0 ]]; then
-        new_header+="N/A\t"
-    fi
-done
-new_header=${new_header%$'\t'}  # Remove the trailing tab
-
-# Process each line of the file
+# Read the header and data
 {
-    echo "$new_header"
-    while IFS='' read -r line; do
+    read -r header
+    oldIFS="$IFS"
+    IFS=$'\t' read -ra headers <<< "$header"
+    IFS="$oldIFS"
+
+    # Create a new header based on the mapping
+    new_header=""
+    for col in "${headers[@]}"; do
+        if [[ ${column_map[$col]+_} ]]; then
+            new_header+="${column_map[$col]}"
+        else
+            new_header+="$col"
+        fi
+        new_header+=$'\t'  # Append a real tab character
+    done
+    new_header=${new_header%$'\t'}  # Remove the trailing tab
+
+    echo "$new_header"  # Output the new header using echo to interpret escape sequences
+
+    # Output the rest of the file
+    while IFS= read -r line; do
         echo "$line"
     done
 } < "$input_file" > "$output_file"
 
-echo "Processed data written to $output_file"
+echo "Header remapping complete. Processed data written to $output_file"
