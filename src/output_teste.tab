@@ -1,0 +1,6 @@
+Library	viral_viral	viral_eve	nohit_viral	nohit_eve	nonviral_viral	nonviral_eve
+SNBN698_virome	0	8	0	4	3	2
+Library	Contigs_gt200	Number_viral_contigs	Number_nonviral_contigs	Number_no_hit_contigs	Total_reads	Reads_mapped_host	Reads_unmapped_host	Reads_mapped_bacter	Preprocessed_reads	Total_assembled_contigs	Contigs_diamond_viral	Contigs_diamond_non_viral	Contigs_diamond_no_hits	Contigs_blastN_viral	Contigs_blastN_non_viral	Contigs_blastN_no_hits
+SNBN698_virome	17	5	12	0	26286504	24871984	1414520	101889	1312631	318	2	0	0	3	12	2
+Library	reads_mapped_viral	reads_mapped_non_viral	reads_mapped_no_hit
+SNBN698_virome	12535	81891	0
