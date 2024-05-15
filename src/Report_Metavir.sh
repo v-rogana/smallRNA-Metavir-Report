@@ -141,13 +141,118 @@ fi
 
 echo "Data extraction complete. Output stored in $output_file"
 
+# Get the basename of the library directory
+library_name=$(basename "$lib_directory")
 
-# Now concatenate outputs
-echo "Concatenating Outputs..."
-cat classifier_output.tab metadata_output.tab mapped_output.tab > combined_output.tab
+# Initialize the header with the library name
+header="Library\tTotal_Size(MB)"
 
-# Logic from Reorder_final_output.sh integrated here
-# Assume it modifies combined_output.tab directly or produces new output
-mv combined_output.tab $output_file
+# Initialize an array to hold subdirectory names for sorting
+declare -a subdirs
+
+# Process each subdirectory to populate names for sorting
+for subdir in "$lib_directory"/*/; do
+    if [[ -d "$subdir" ]]; then
+        subdirs+=("$(basename "$subdir")")
+    fi
+done
+
+# Sort subdirectory names and append to header
+IFS=$'\n' subdirs=($(sort <<<"${subdirs[*]}"))
+unset IFS
+for subdir_name in "${subdirs[@]}"; do
+    header+="\t$subdir_name"
+done
+
+# Write the header to the output file
+echo -e "$header" > disk_usage_output.tab
+
+# Calculate the total size of the library directory in megabytes with two decimal places
+total_size=$(du -sk "$lib_directory" | awk '{printf "%.2f", $1 / 1024}')
+
+# Start the output line with the library name and total size
+output_line="$library_name\t$total_size"
+
+# Append each subdirectory size to the output line
+for subdir_name in "${subdirs[@]}"; do
+    subdir_path="$lib_directory/$subdir_name"
+    if [[ -d "$subdir_path" ]]; then
+        subdir_size=$(du -sk "$subdir_path" | awk '{printf "%.2f", $1 / 1024}')
+    else
+        subdir_size="N/A"
+    fi
+    output_line+="\t$subdir_size"
+done
+
+# Write the complete line to the output file
+echo -e "$output_line" >> disk_usage_output.tab
+
+echo "Subdirectory sizes in MB written to $output_file"
+
+# Get the basename of the library directory
+library_name=$(basename "$lib_directory")
+
+# Find the first log file that matches the pattern *.log
+log_file=$(find "$lib_directory" -maxdepth 1 -type f -name "*.log" | head -n 1)
+
+if [[ -z "$log_file" ]]; then
+    echo "No log file found in the directory."
+    exit 3
+fi
+
+# Print the header into the output file
+echo -e "Library\tBlastn\tDIAMOND (Blastx)\tBuild small RNA profiles\tHandle FASTA sequences\tRunning velvet (fixed hash)\tRunning velvet optimiser\tTotal time elapsed" > task_times_output.tab
+
+# Execute awk to extract and format the output as a table, and APPEND to the specified output file
+awk -v libName="$library_name" -v outFile=task_times_output.tab '
+BEGIN {
+    # Define array to store times with initial value of "N/A"
+    times["Blastn"] = "N/A";
+    times["DIAMOND (Blastx)"] = "N/A";
+    times["Build small RNA profiles"] = "N/A";
+    times["Handle FASTA sequences"] = "N/A";
+    times["Running velvet (fixed hash)"] = "N/A";
+    times["Run Velvet optmiser (automatically defined hash)"] = "N/A";
+    times["Total time elapsed"] = "N/A";
+}
+
+/End of step/ {
+    step = $0
+    if (step ~ /Blastn/) times["Blastn"] = getline_time();
+    else if (step ~ /DIAMOND \(Blastx\)/) times["DIAMOND (Blastx)"] = getline_time();
+    else if (step ~ /Build small RNA profiles/) times["Build small RNA profiles"] = getline_time();
+    else if (step ~ /Handle FASTA sequences/) times["Handle FASTA sequences"] = getline_time();
+    else if (step ~ /Running velvet \(fixed hash\)/) times["Running velvet (fixed hash)"] = getline_time();
+    else if (step ~ /Run Velvet optmiser \(automatically defined hash\)/) times["Run Velvet optmiser (automatically defined hash)"] = getline_time();
+}
+
+/^-- THE END --/ {
+    getline; # Move to the "Time elapsed" line
+    times["Total time elapsed"] = $3;
+}
+
+function getline_time() {
+    getline; getline; getline;  # Skip to the "Time elapsed" line
+    return $3;
+}
+
+END {
+    # Append all stored times in order
+    print libName "\t" times["Blastn"] "\t" times["DIAMOND (Blastx)"] "\t" times["Build small RNA profiles"] "\t" times["Handle FASTA sequences"] "\t" times["Running velvet (fixed hash)"] "\t" times["Run Velvet optmiser (automatically defined hash)"] "\t" times["Total time elapsed"] >> outFile;
+}
+' "$log_file"
+
+# Define the comprehensive header once and write it to the output file.
+echo -e "Library\tviral_viral\tviral_eve\tnohit_viral\tnohit_eve\tnonviral_viral\tnonviral_eve\tContigs_gt200\tNumber_viral_contigs\tNumber_nonviral_contigs\tNumber_no_hit_contigs\tTotal_reads\tReads_mapped_host\tReads_unmapped_host\tReads_mapped_bacter\tPreprocessed_reads\tTotal_assembled_contigs\tContigs_diamond_viral\tContigs_diamond_non_viral\tContigs_diamond_no_hits\tContigs_blastN_viral\tContigs_blastN_non_viral\tContigs_blastN_no_hits\treads_mapped_viral\treads_mapped_non_viral\treads_mapped_no_hit\tTotal_Size(MB)\t02_filter_size_gaps_convertion\t04_getUnmapped\t05_1_assembleUnmapped_opt\t05_2_assembleUnmapped_fix\t05_3_assembleUnmapped_opt_fix\t05_4_assembleUnmapped_opt_20to23\t05_5_assembleUnmapped_opt_24to30\t05_6_cap3\t06_blast\t07_reportBlast\t11_profiles\t12_z_score_small_rna_features\t13_virus_eve_classif\tBlastn\tDIAMOND (Blastx)\tBuild small RNA profiles\tHandle FASTA sequences\tRunning velvet (fixed hash)\tRunning velvet optimiser\tTotal time elapsed" > $output_file
+
+# Concatenate the data only, ensuring each script outputs data correctly to its file.
+# Assuming each output has one line of data corresponding to the header defined above.
+paste <(cat classifier_output.tab) \
+      <(cut -f2- metadata_output.tab) \
+      <(cut -f2- mapped_output.tab) \
+      <(cut -f2- disk_usage_output.tab) \
+      <(cut -f2- task_times_output.tab) >> $output_file
+sed -i '2d' $output_file # Remove duplicate row
 
 echo "Process completed successfully, final output saved to $output_file"
+
