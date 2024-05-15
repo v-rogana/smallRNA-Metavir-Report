@@ -26,7 +26,7 @@ if [ -d "$lib_dir" ]; then
     # Define file paths for SAM files
     viral_sam="${report_blast_dir}all_viral_hits.mapped.sort.sam"
     non_viral_sam="${report_blast_dir}all_non_viral_hits.mapped.sort.sam"
-    no_hit_sam="${report_blast_dir}diamond_blastx_NoHits.mapped.sort.sam"
+    no_hit_sam="${report_blast_dir}contigs_nohits_FINAL_diamond.mapped.sort.sam"
 
     # Check if SAM files exist and count mapped reads
     if [[ -f "$viral_sam" ]]; then

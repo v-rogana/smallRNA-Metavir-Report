@@ -43,12 +43,13 @@ for file in "$@"; do
         done
     done < <(tail -n +2 "$file") # Skip the header line
 done
+
 # Write to output file
 # Print the header
 {
     printf "%s" "${headers[0]}"
     for (( i=1; i<${#headers[@]}; i++ )); do
-        printf "\t%s" "${headers[i]}"
+        printf ",%s" "${headers[i]}"  # Changed tab to comma for CSV format
     done
     printf "\n"
 } > "$output_file"
@@ -64,7 +65,7 @@ for key in "${!library_data[@]}"; do
         printf "%s" "$library"
         for header in "${headers[@]:1}"; do  # Skip the first header since it's already printed as the library
             value="${library_data["$library;$header"]}"
-            printf "\t%s" "${value:-N/A}"  # Print tab first then value, no leading spaces
+            printf ",%s" "${value:-N/A}"  # Changed tab to comma, ensuring no leading spaces
         done
         printf "\n"
     } >> "$output_file"

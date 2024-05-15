@@ -9,50 +9,61 @@ fi
 lib_directory=$1
 output_file=$2
 
-# Define the tasks and their respective end marks in the logs, ordered correctly
-declare -A task_patterns=(
-    ["Blastn"]="End of step 'Blastn'"
-    ["DIAMOND (Blastx)"]="End of step 'DIAMOND \(Blastx\)'"
-    ["Build small RNA profiles"]="End of step 'Build small RNA profiles'"
-    ["Handle FASTA sequences"]="End of step 'Handle FASTA sequences'"
-    ["Running velvet (fixed hash)"]="End of step 'Running velvet \(fixed hash\)'"
-    ["Running velvet optimiser"]="End of step 'Run Velvet optimiser'"
-    ["Total time elapsed"]="-- THE END --"
-)
+# Check if the directory exists
+if [[ ! -d "$lib_directory" ]]; then
+    echo "The specified directory does not exist."
+    exit 2
+fi
 
-# Header for the output file
-header_line="Library"
-for task in "${!task_patterns[@]}"; do
-    header_line+=$'\t'"$task"
-done
-echo "$header_line" > "$output_file"
+# Get the basename of the library directory
+library_name=$(basename "$lib_directory")
 
-# Process each log file in the directory
-for log_file in "$lib_directory"/*.log; do
-    echo "Processing $log_file"
-    library_name=$(basename "$lib_directory")
-    output_line="$library_name"
+# Find the first log file that matches the pattern *.log
+log_file=$(find "$lib_directory" -maxdepth 1 -type f -name "*.log" | head -n 1)
 
-    # Extract times for each task using awk
-    for task in "${!task_patterns[@]}"; do
-        pattern="${task_patterns[$task]}"
-        # Use awk to search for pattern and then the next occurrence of 'Time elapsed:'
-        time_elapsed=$(awk -v pat="$pattern" -v start=0 '
-        $0 ~ pat { start=1; next }
-        start && /Time elapsed:/ { print $3; exit }
-        ' "$log_file")
+if [[ -z "$log_file" ]]; then
+    echo "No log file found in the directory."
+    exit 3
+fi
 
-        # If time is not found, mark as N/A
-        if [[ -z "$time_elapsed" ]]; then
-            time_elapsed="N/A"
-        fi
+# Print the header into the output file
+echo -e "Library\tBlastn\tDIAMOND (Blastx)\tBuild small RNA profiles\tHandle FASTA sequences\tRunning velvet (fixed hash)\tRunning velvet optimiser\tTotal time elapsed" > "$output_file"
 
-        # Append the extracted time to the output line
-        output_line+=$'\t'"$time_elapsed"
-    done
+# Execute awk to extract and format the output as a table, and APPEND to the specified output file
+awk -v libName="$library_name" -v outFile="$output_file" '
+BEGIN {
+    # Define array to store times with initial value of "N/A"
+    times["Blastn"] = "N/A";
+    times["DIAMOND (Blastx)"] = "N/A";
+    times["Build small RNA profiles"] = "N/A";
+    times["Handle FASTA sequences"] = "N/A";
+    times["Running velvet (fixed hash)"] = "N/A";
+    times["Run Velvet optmiser (automatically defined hash)"] = "N/A";
+    times["Total time elapsed"] = "N/A";
+}
 
-    # Write the complete line to the output file
-    echo "$output_line" >> "$output_file"
-done
+/End of step/ {
+    step = $0
+    if (step ~ /Blastn/) times["Blastn"] = getline_time();
+    else if (step ~ /DIAMOND \(Blastx\)/) times["DIAMOND (Blastx)"] = getline_time();
+    else if (step ~ /Build small RNA profiles/) times["Build small RNA profiles"] = getline_time();
+    else if (step ~ /Handle FASTA sequences/) times["Handle FASTA sequences"] = getline_time();
+    else if (step ~ /Running velvet \(fixed hash\)/) times["Running velvet (fixed hash)"] = getline_time();
+    else if (step ~ /Run Velvet optmiser \(automatically defined hash\)/) times["Run Velvet optmiser (automatically defined hash)"] = getline_time();
+}
 
-echo "Time elapsed for tasks written to $output_file"
+/^-- THE END --/ {
+    getline; # Move to the "Time elapsed" line
+    times["Total time elapsed"] = $3;
+}
+
+function getline_time() {
+    getline; getline; getline;  # Skip to the "Time elapsed" line
+    return $3;
+}
+
+END {
+    # Append all stored times in order
+    print libName "\t" times["Blastn"] "\t" times["DIAMOND (Blastx)"] "\t" times["Build small RNA profiles"] "\t" times["Handle FASTA sequences"] "\t" times["Running velvet (fixed hash)"] "\t" times["Run Velvet optmiser (automatically defined hash)"] "\t" times["Total time elapsed"] >> outFile;
+}
+' "$log_file"
