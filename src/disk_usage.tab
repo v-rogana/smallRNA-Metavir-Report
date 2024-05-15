@@ -1,2 +1,0 @@
-Library	Total_Size(MB)	02_filter_size_gaps_convertion	04_getUnmapped	05_1_assembleUnmapped_opt	05_2_assembleUnmapped_fix	05_3_assembleUnmapped_opt_fix	05_4_assembleUnmapped_opt_20to23	05_5_assembleUnmapped_opt_24to30	05_6_cap3	06_blast	07_reportBlast	11_profiles	12_z_score_small_rna_features	13_virus_eve_classif
-SNBN698_virome	308.79	0.00	259.68	0.04	0.07	0.09	0.10	0.00	1.73	3.07	35.11	8.79	0.05	0.02
