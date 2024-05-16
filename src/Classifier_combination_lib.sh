@@ -21,31 +21,33 @@ for comb in "${combinations[@]}"; do
     counts[$comb]=0
 done
 
-# Use awk to process all files and count combinations directly
 awk -F',' '
     BEGIN {
-        # Define the combinations
-        combos["viral_viral"] = "viral_viral";
-        combos["viral_eve"] = "viral_eve";
-        combos["nohit_viral"] = "nohit_viral";
-        combos["nohit_eve"] = "nohit_eve";
-        combos["nonviral_viral"] = "nonviral_viral";
-        combos["nonviral_eve"] = "nonviral_eve";
+        # Initialize counts for each category
+        counts["viral_viral"] = 0;
+        counts["viral_eve"] = 0;
+        counts["nohit_viral"] = 0;
+        counts["nohit_eve"] = 0;
+        counts["nonviral_viral"] = 0;
+        counts["nonviral_eve"] = 0;
     }
     FNR > 1 { # Skip header
         key = $3 "_" $NF; # Form the key from columns
         gsub(/[ ,]/, "_", key); # Clean up the key
         gsub(/ /, "", key);
-        if (key in combos) {
+        if (key in counts) {
             counts[key]++;
         }
     }
     END {
-        # Output the counts in the predefined order, ensure the first count starts on a new line
-        for (combo in combos) {
-            printf "\t%s", counts[combo]+0; # +0 to ensure uninitialized counts are treated as 0
-        }
-        printf "\n";
+        # Output the counts in the predefined order, not by array iteration
+        printf "\t%d", counts["viral_viral"];
+        printf "\t%d", counts["viral_eve"];
+        printf "\t%d", counts["nohit_viral"];
+        printf "\t%d", counts["nohit_eve"];
+        printf "\t%d", counts["nonviral_viral"];
+        printf "\t%d", counts["nonviral_eve"];
+        print ""; # Finish the line
     }
 ' $(find "$LIB_DIRECTORY/13_virus_eve_classif" -name '*.csv') > counts.temp
 

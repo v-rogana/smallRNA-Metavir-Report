@@ -25,28 +25,31 @@ done
 # Use awk to process all files and count combinations directly
 awk -F',' '
     BEGIN {
-        # Define the combinations
-        combos["viral_viral"] = "viral_viral";
-        combos["viral_eve"] = "viral_eve";
-        combos["nohit_viral"] = "nohit_viral";
-        combos["nohit_eve"] = "nohit_eve";
-        combos["nonviral_viral"] = "nonviral_viral";
-        combos["nonviral_eve"] = "nonviral_eve";
+        # Initialize counts for each category
+        counts["viral_viral"] = 0;
+        counts["viral_eve"] = 0;
+        counts["nohit_viral"] = 0;
+        counts["nohit_eve"] = 0;
+        counts["nonviral_viral"] = 0;
+        counts["nonviral_eve"] = 0;
     }
     FNR > 1 { # Skip header
         key = $3 "_" $NF; # Form the key from columns
         gsub(/[ ,]/, "_", key); # Clean up the key
         gsub(/ /, "", key);
-        if (key in combos) {
+        if (key in counts) {
             counts[key]++;
         }
     }
     END {
-        # Output the counts in the predefined order, ensure the first count starts on a new line
-        for (combo in combos) {
-            printf "\t%s", counts[combo]+0; # +0 to ensure uninitialized counts are treated as 0
-        }
-        printf "\n";
+        # Output the counts in the predefined order, not by array iteration
+        printf "\t%d", counts["viral_viral"];
+        printf "\t%d", counts["viral_eve"];
+        printf "\t%d", counts["nohit_viral"];
+        printf "\t%d", counts["nohit_eve"];
+        printf "\t%d", counts["nonviral_viral"];
+        printf "\t%d", counts["nonviral_eve"];
+        print ""; # Finish the line
     }
 ' $(find "$lib_directory/13_virus_eve_classif" -name '*.csv') > counts.temp
 
@@ -139,7 +142,7 @@ if [ -d "$lib_directory" ]; then
     echo -e "$library_name\t$reads_mapped_viral\t$reads_mapped_non_viral\t$reads_mapped_no_hit" >> mapped_output.tab
 fi
 
-echo "Data extraction complete. Output stored in $output_file"
+echo "Data extraction complete."
 
 # Get the basename of the library directory
 library_name=$(basename "$lib_directory")
@@ -187,7 +190,7 @@ done
 # Write the complete line to the output file
 echo -e "$output_line" >> disk_usage_output.tab
 
-echo "Subdirectory sizes in MB written to $output_file"
+echo "Subdirectory sizes in MB written"
 
 # Get the basename of the library directory
 library_name=$(basename "$lib_directory")
@@ -243,7 +246,7 @@ END {
 ' "$log_file"
 
 # Define the comprehensive header once and write it to the output file.
-echo -e "Library\tviral_viral\tviral_eve\tnohit_viral\tnohit_eve\tnonviral_viral\tnonviral_eve\tContigs_gt200\tNumber_viral_contigs\tNumber_nonviral_contigs\tNumber_no_hit_contigs\tTotal_reads\tReads_mapped_host\tReads_unmapped_host\tReads_mapped_bacter\tPreprocessed_reads\tTotal_assembled_contigs\tContigs_diamond_viral\tContigs_diamond_non_viral\tContigs_diamond_no_hits\tContigs_blastN_viral\tContigs_blastN_non_viral\tContigs_blastN_no_hits\treads_mapped_viral\treads_mapped_non_viral\treads_mapped_no_hit\tTotal_Size(MB)\t02_filter_size_gaps_convertion\t04_getUnmapped\t05_1_assembleUnmapped_opt\t05_2_assembleUnmapped_fix\t05_3_assembleUnmapped_opt_fix\t05_4_assembleUnmapped_opt_20to23\t05_5_assembleUnmapped_opt_24to30\t05_6_cap3\t06_blast\t07_reportBlast\t11_profiles\t12_z_score_small_rna_features\t13_virus_eve_classif\tBlastn\tDIAMOND (Blastx)\tBuild small RNA profiles\tHandle FASTA sequences\tRunning velvet (fixed hash)\tRunning velvet optimiser\tTotal time elapsed" > $output_file
+echo -e "Library\tviral_viral\tviral_eve\tnohit_viral\tnohit_eve\tnonviral_viral\tnonviral_eve\tContigs_gt200\tNumber_viral_contigs\tNumber_nonviral_contigs\tNumber_no_hit_contigs\tTotal_reads\tReads_mapped_host\tReads_unmapped_host\tReads_mapped_bacter\tPreprocessed_reads\tTotal_assembled_contigs\tContigs_diamond_viral\tContigs_diamond_non_viral\tContigs_diamond_no_hits\tContigs_blastN_viral\tContigs_blastN_non_viral\tContigs_blastN_no_hits\treads_mapped_viral\treads_mapped_non_viral\treads_mapped_no_hit\tTotal_Size(MB)\t02_filter_size_gaps_convertion\t04_getUnmapped\t05_1_assembleUnmapped_opt\t05_2_assembleUnmapped_fix\t05_3_assembleUnmapped_opt_fix\t05_4_assembleUnmapped_opt_20to23\t05_5_assembleUnmapped_opt_24to30\t05_6_cap3\t06_blast\t07_reportBlast\t11_profiles\t12_z_score_small_rna_features\t13_virus_eve_classif\tBlastn\tDIAMOND (Blastx)\tBuild small RNA profiles\tHandle FASTA sequences\tRunning velvet (fixed hash)\tRunning velvet optimiser\tTotal time elapsed" > merged.tab
 
 # Concatenate the data only, ensuring each script outputs data correctly to its file.
 # Assuming each output has one line of data corresponding to the header defined above.
@@ -251,8 +254,98 @@ paste <(cat classifier_output.tab) \
       <(cut -f2- metadata_output.tab) \
       <(cut -f2- mapped_output.tab) \
       <(cut -f2- disk_usage_output.tab) \
-      <(cut -f2- task_times_output.tab) >> $output_file
-sed -i '2d' $output_file # Remove duplicate row
+      <(cut -f2- task_times_output.tab) >> merged.tab
 
-echo "Process completed successfully, final output saved to $output_file"
+sed -i '2d' merged.tab # Remove duplicate row
 
+echo "Concatenation and initial cleaning complete. Now reordering columns..."
+
+# Rename columns as specified and write to the temporary file
+awk -F'\t' -v OFS='\t' '
+BEGIN {
+    # Mapping old column names to new column names
+    col_rename["Preprocessed_reads"]="Reads_unmapped_bacter";
+    col_rename["Total_Size(MB)"]="du_Total_Size";
+    col_rename["DIAMOND (Blastx)"]="DIAMOND";
+    col_rename["Build small RNA profiles"]="Build_small_RNA_profiles";
+    col_rename["Total time elapsed"]="Total_time_elapsed";
+    col_rename["02_filter_size_gaps_convertion"]="du_02_filter_size_gaps_convertion";
+    col_rename["03_mapping_vector"]="du_03_mapping_vector";
+    col_rename["04_getUnmapped"]="du_04_getUnmapped";
+    col_rename["05_1_assembleUnmapped_opt"]="du_05_1_assembleUnmapped_opt";
+    col_rename["05_2_assembleUnmapped_fix"]="du_05_2_assembleUnmapped_fix";
+    col_rename["05_3_assembleUnmapped_opt_fix"]="du_05_3_assembleUnmapped_opt_fix";
+    col_rename["05_4_assembleUnmapped_opt_20to23"]="du_05_4_assembleUnmapped_opt_20to23";
+    col_rename["05_5_assembleUnmapped_opt_24to30"]="du_05_5_assembleUnmapped_opt_24to30";
+    col_rename["05_6_cap3"]="du_05_6_cap3";
+    col_rename["06_blast"]="du_06_blast";
+    col_rename["07_reportBlast"]="du_07_reportBlast";
+    col_rename["11_profiles"]="du_11_profiles";
+    col_rename["12_z_score_small_rna_features"]="du_12_z_score_small_rna_features";
+    col_rename["13_virus_eve_classif"]="du_13_virus_eve_classif";
+    col_rename["Handle FASTA sequences"]="Handle_fasta_sequences";
+    col_rename["Running velvet (fixed hash)"]="Running_velvet";
+    col_rename["Running velvet optimiser"]="Running_velvet_optmiser";
+    col_rename["reads_mapped_viral"]="reads_mapped_viral";
+    col_rename["reads_mapped_non_viral"]="reads_mapped_non_viral";
+    col_rename["reads_mapped_no_hit"]="reads_mapped_no_hit";
+}
+NR == 1 {
+    # Print the new header based on renaming
+    for (i=1; i<=NF; i++) {
+        if ($i in col_rename)
+            printf "%s%s", col_rename[$i], (i<NF ? OFS : "\n");
+        else
+            printf "%s%s", $i, (i<NF ? OFS : "\n");
+    }
+    next;
+}
+{
+    # Print the data rows as they are
+    print;
+}' merged.tab > renamed.tab 
+
+# Define the new order of columns explicitly as shown earlier
+new_order=("Library" "Total_reads" "Reads_mapped_host" "Reads_unmapped_host" "Reads_mapped_bacter" "Reads_unmapped_bacter" "Contigs_gt200" "Number_viral_contigs" "Number_nonviral_contigs" "Number_no_hit_contigs" "Contigs_blastN_viral" "Contigs_blastN_non_viral" "Contigs_blastN_no_hits" "Contigs_diamond_viral" "Contigs_diamond_non_viral" "Contigs_diamond_no_hits" "reads_mapped_viral" "reads_mapped_non_viral" "reads_mapped_no_hit" "viral_viral" "viral_eve" "nohit_viral" "nohit_eve" "nonviral_viral" "nonviral_eve" "du_Total_Size" "du_02_filter_size_gaps_convertion" "du_03_mapping_vector" "du_04_getUnmapped" "du_05_1_assembleUnmapped_opt" "du_05_2_assembleUnmapped_fix" "du_05_3_assembleUnmapped_opt_fix" "du_05_4_assembleUnmapped_opt_20to23" "du_05_5_assembleUnmapped_opt_24to30" "du_05_6_cap3" "du_06_blast" "du_07_reportBlast" "du_11_profiles" "du_12_z_score_small_rna_features" "du_13_virus_eve_classif" "Handle_fasta_sequences" "Running_velvet" "Running_velvet_optmiser" "Blastn" "DIAMOND" "Build_small_RNA_profiles" "Total_time_elapsed")
+
+# Script to reorder columns in a file according to a predefined list, with "NA" for missing columns
+awk -F'\t' -v OFS='\t' '
+BEGIN {
+    # Define the desired order of columns explicitly
+    split("Library Total_reads Reads_mapped_host Reads_unmapped_host Reads_mapped_bacter Reads_unmapped_bacter Contigs_gt200 Number_viral_contigs Number_nonviral_contigs Number_no_hit_contigs Contigs_blastN_viral Contigs_blastN_non_viral Contigs_blastN_no_hits Contigs_diamond_viral Contigs_diamond_non_viral Contigs_diamond_no_hits reads_mapped_viral reads_mapped_non_viral reads_mapped_no_hit viral_viral viral_eve nohit_viral nohit_eve nonviral_viral nonviral_eve du_Total_Size du_02_filter_size_gaps_convertion du_03_mapping_vector du_04_getUnmapped du_05_1_assembleUnmapped_opt du_05_2_assembleUnmapped_fix du_05_3_assembleUnmapped_opt_fix du_05_4_assembleUnmapped_opt_20to23 du_05_5_assembleUnmapped_opt_24to30 du_05_6_cap3 du_06_blast du_07_reportBlast du_11_profiles du_12_z_score_small_rna_features du_13_virus_eve_classif Handle_fasta_sequences Running_velvet Running_velvet_optmiser Blastn DIAMOND Build_small_RNA_profiles Total_time_elapsed", new_order, " ");
+}
+FNR == 1 {
+    # Create a map from column names to their indices
+    for (i=1; i<=NF; i++) {
+        header[$i] = i; # Map column names to positions
+    }
+    # Print the reordered headers
+    for (i=1; i<=length(new_order); i++) {
+        printf "%s%s", new_order[i], (i<length(new_order) ? OFS : "\n");
+    }
+}
+FNR > 1 {
+    # Print each row according to the new header order
+    for (i=1; i<=length(new_order); i++) {
+        col_name = new_order[i];
+        # Check if column exists and print its value, else print "N/A"
+        if (col_name in header) {
+            printf "%s%s", $(header[col_name]), (i<length(new_order) ? OFS : "\n");
+        } else {
+            printf "%s%s", "N/A", (i<length(new_order) ? OFS : "\n");
+        }
+    }
+}
+' renamed.tab > "$output_file"
+
+# Cleanup
+rm classifier_output.tab
+rm counts.temp
+rm disk_usage_output.tab
+rm task_times_output.tab
+rm metadata_output.tab
+rm mapped_output.tab
+rm merged.tab
+rm renamed.tab
+
+echo "Reordering complete. Output written to $output_file"
